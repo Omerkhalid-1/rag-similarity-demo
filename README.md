@@ -11,8 +11,9 @@ A Q&A RAG demo that shows embeddings and cosine similarity for every question.
 
 The website in `docs/` is fully self-contained (nothing is downloaded from other sites):
 
-- `docs/kb.json` holds the embeddings, computed locally by `build_kb.py`: every dataset question and answer, every button question, and the 2-D map. The buttons work instantly.
-- Questions typed by hand are embedded in the browser with the model stored in `docs/models/` (Transformers.js in `docs/lib/`), loaded the first time you type a question.
+- `docs/kb.json` holds the embeddings, computed locally by `build_kb.py`: every dataset question and answer, every button question, and the 2-D map. The buttons work instantly, with no model in the browser.
+- Questions typed by hand are embedded in the browser with the 8-bit model stored in `docs/models/` (23 MB, Transformers.js in `docs/lib/`). It starts loading in the background as soon as the page opens.
+- The website uses the 8-bit model, so its scores differ slightly from the Python scripts (`rag_demo.py`, `server.py`), which use the full model.
 
 ## Run locally
 

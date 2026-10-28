@@ -96,6 +96,7 @@
     <div class="controls">
       <label>Similarity threshold <input type="range" id="thr" min="0.80" max="1" step="0.005" value="0.99"> <b id="thrVal">99.0%</b></label>
       <label>Q&amp;A pairs passed to the LLM <input type="range" id="topk" min="1" max="5" step="1" value="3" style="width:120px"> <b id="topkVal">3</b></label>
+      <span>Model for typed questions: <b id="modelState" style="min-width:0">loading…</b></span>
     </div>
   </div>
 
@@ -209,14 +210,25 @@ function loadModel() {
     T.env.allowLocalModels = true;
     T.env.localModelPath = new URL("models/", location.href).href;
     T.env.backends.onnx.wasm.wasmPaths = new URL("lib/", location.href).href;
-    extractor = await T.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {dtype: "fp32", device: "wasm"});
+    extractor = await T.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {dtype: "q8", device: "wasm"});
+    // Typed questions are compared with dataset vectors made by this same engine, so an exact match is exactly 100%.
+    // (One text at a time: the 8-bit model gives slightly different vectors when texts are batched.)
+    KB.liveVectors = [], KB.liveAnswerVectors = [];
+    for (const f of KB.faq) {
+      KB.liveVectors.push(await embedText(f.question));
+      KB.liveAnswerVectors.push(await embedText(f.answer));
+    }
   })();
   return modelLoading;
 }
+async function embedText(text) {
+  return (await extractor([text], {pooling: "mean", normalize: true})).tolist()[0];
+}
+// returns the question vector plus the dataset vectors to compare it with
 async function embedQuestion(text) {
-  if (KB.queries[text]) return KB.queries[text];
+  if (KB.queries[text]) return {vector: KB.queries[text], kb: KB.vectors, kbAnswers: KB.answerVectors};
   const status = $("status");
-  status.className = "banner llm"; status.textContent = "Loading the embedding model for typed questions (first time only)…";
+  if (!extractor) { status.className = "banner llm"; status.textContent = "Loading the embedding model (23 MB, first time only)…"; }
   try { await loadModel(); }
   catch (e) {
     status.className = "banner warn";
@@ -224,8 +236,7 @@ async function embedQuestion(text) {
     modelLoading = null; throw e;
   }
   status.className = "hidden";
-  const out = await extractor([text], {pooling: "mean", normalize: true});
-  return out.tolist()[0];
+  return {vector: await embedText(text), kb: KB.liveVectors, kbAnswers: KB.liveAnswerVectors};
 }
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 const cosine = (a, b) => dot(a, b) / (Math.sqrt(dot(a, a)) * Math.sqrt(dot(b, b)));
@@ -237,13 +248,13 @@ async function ask() {
   document.body.classList.add("loading");
   try {
     const threshold = +$("thr").value, topK = +$("topk").value;
-    const vector = await embedQuestion(question);
-    const sims = KB.vectors.map(v => cosine(vector, v));
+    const {vector, kb, kbAnswers} = await embedQuestion(question);
+    const sims = kb.map(v => cosine(vector, v));
     const order = [...sims.keys()].sort((i, j) => sims[j] - sims[i]);
     const best = order[0], hit = sims[best] >= threshold;
     last = {question, threshold, vector, point: project(vector), sims, order, best, top: order.slice(0, topK),
             route: hit ? "dataset" : "llm", source: hit ? "dataset" : "transfer",
-            answer: hit ? KB.faq[best].answer : null, answer_vector: hit ? KB.answerVectors[best] : null};
+            answer: hit ? KB.faq[best].answer : null, answer_vector: hit ? kbAnswers[best] : null, kb};
     const h = history[0];
     if (!h || h.question !== last.question || h.threshold !== last.threshold)
       history.unshift({question, match: KB.faq[best].question, sim: sims[best], threshold, route: last.route});
@@ -294,7 +305,7 @@ function renderSim() {
 function heatRows() {
   const d = last, faq = KB.faq;
   const rows = [{label: "PROMPT: " + d.question, v: d.vector}];
-  d.top.forEach(i => rows.push({label: pct(d.sims[i]) + " · " + faq[i].question, v: KB.vectors[i]}));
+  d.top.forEach(i => rows.push({label: pct(d.sims[i]) + " · " + faq[i].question, v: d.kb[i]}));
   if (d.route === "dataset") rows.push({label: "ANSWER: " + faq[d.best].answer.slice(0, 45) + "…", v: d.answer_vector});
   return rows;
 }
@@ -345,7 +356,7 @@ function renderMap() {
 }
 
 function renderMath() {
-  const d = last, A = d.vector, B = KB.vectors[d.best];
+  const d = last, A = d.vector, B = d.kb[d.best];
   const prod = A.map((a, i) => a * B[i]);
   const dot = prod.reduce((s, x) => s + x, 0);
   const nA = Math.sqrt(A.reduce((s, x) => s + x * x, 0)), nB = Math.sqrt(B.reduce((s, x) => s + x * x, 0));
@@ -383,6 +394,9 @@ function renderTables() {
   $("dataTable").innerHTML = "<tr><th>#</th><th>Question (embedded)</th><th>Answer</th></tr>" +
     KB.faq.map((f, i) => `<tr><td>${i + 1}</td><td>${esc(f.question)}</td><td>${esc(f.answer)}</td></tr>`).join("");
   ask();
+  // start loading the model for typed questions in the background, so it is ready before anyone types
+  loadModel().then(() => { $("modelState").textContent = "ready"; },
+                   () => { $("modelState").textContent = "unavailable (buttons still work)"; });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => last && render());
 })();
 </script>
