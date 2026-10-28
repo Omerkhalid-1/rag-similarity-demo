@@ -9,7 +9,10 @@ A Q&A RAG demo that shows embeddings and cosine similarity for every question.
 
 **Live dashboard:** https://omerkhalid-1.github.io/rag-similarity-demo/
 
-The website in `docs/` runs entirely in the browser (Transformers.js). The first visit downloads the model (~90 MB), then it is cached.
+The website in `docs/` is fully self-contained (nothing is downloaded from other sites):
+
+- `docs/kb.json` holds the embeddings, computed locally by `build_kb.py`: every dataset question and answer, every button question, and the 2-D map. The buttons work instantly.
+- Questions typed by hand are embedded in the browser with the model stored in `docs/models/` (Transformers.js in `docs/lib/`), loaded the first time you type a question.
 
 ## Run locally
 
@@ -19,4 +22,10 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python server.py            # dashboard at http://localhost:8501
 ```
 
-To change the dataset, edit `faq.json` (and `docs/faq.json` for the website).
+## Change the dataset
+
+```bash
+# 1. edit faq.json (and the VARIATIONS list in build_kb.py if you like)
+.venv/bin/python build_kb.py        # re-computes docs/kb.json locally
+git add -A && git commit -m "Update dataset" && git push
+```

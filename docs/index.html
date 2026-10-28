@@ -90,7 +90,7 @@
       <input id="q" placeholder="Ask a question…" value="What is RAG?" autocomplete="off">
       <button class="primary" type="submit">Ask</button>
     </form>
-    <div class="banner llm" id="status" style="margin:16px 0 0">Loading…</div>
+    <div class="banner llm" id="status" style="margin:16px 0 0">Loading the dataset…</div>
     <div class="examples" id="examples"></div>
     <div class="examples" id="variations"></div>
     <div class="controls">
@@ -159,17 +159,11 @@
 
     <div class="panel card" id="p-hist"><div class="scroll"><table id="histTable"></table></div></div>
     <div class="panel card" id="p-data"><div class="scroll"><table id="dataTable"></table></div>
-      <p class="note">Only the questions are embedded and searched. Edit faq.json to change the dataset.</p></div>
+      <p class="note">Only the questions are embedded and searched. Edit faq.json and run build_kb.py to change the dataset.</p></div>
   </div>
 </div>
 
 <script>
-// Variations of the dataset questions, to show what happens near / below the threshold
-const VARIATIONS = {
-  "Near duplicate (high similarity)": ["What is RAG", "How do I reset my password", "What are your support hours"],
-  "Paraphrase → transferred to LLM": ["How can I change my password?", "How can I cancel my plan?", "Why does an LLM make things up?"],
-  "Off-topic → transferred to LLM": ["What's the weather today?", "Who won the World Cup?"],
-};
 let KB = null, last = null, history = [];
 const $ = id => document.getElementById(id);
 const pct = (x, d = 2) => (x * 100).toFixed(d) + "%";
@@ -194,7 +188,6 @@ function addChips(target, title, qs) {
   div.querySelectorAll(".chip").forEach((b, i) => b.onclick = () => { $("q").value = qs[i]; ask(); });
   $(target).appendChild(div);
 }
-for (const [group, qs] of Object.entries(VARIATIONS)) addChips("variations", group, qs);
 let debounce;
 $("thr").oninput = () => { $("thrVal").textContent = pct(+$("thr").value, 1); clearTimeout(debounce); debounce = setTimeout(() => last && ask(), 250); };
 $("topk").oninput = () => { $("topkVal").textContent = $("topk").value; clearTimeout(debounce); debounce = setTimeout(() => last && ask(), 250); };
@@ -205,53 +198,46 @@ document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll("#p-" + t.dataset.tab + " .js-plotly-plot").forEach(el => Plotly.Plots.resize(el));
 });
 
-// ---- RAG logic (runs entirely in the browser) ----
-let extractor = null;
-async function embed(texts) {
-  const out = await extractor(texts, {pooling: "mean", normalize: true});
-  return out.tolist();
+// ---- RAG logic ----
+// Dataset + button embeddings are pre-computed locally (build_kb.py -> kb.json).
+// A question typed by hand is embedded in the browser with the model stored in models/ (no external downloads).
+let extractor = null, modelLoading = null;
+function loadModel() {
+  if (!modelLoading) modelLoading = (async () => {
+    const T = await import("./lib/transformers.min.js");
+    T.env.allowRemoteModels = false;
+    T.env.allowLocalModels = true;
+    T.env.localModelPath = new URL("models/", location.href).href;
+    T.env.backends.onnx.wasm.wasmPaths = new URL("lib/", location.href).href;
+    extractor = await T.pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {dtype: "fp32", device: "wasm"});
+  })();
+  return modelLoading;
+}
+async function embedQuestion(text) {
+  if (KB.queries[text]) return KB.queries[text];
+  const status = $("status");
+  status.className = "banner llm"; status.textContent = "Loading the embedding model for typed questions (first time only)…";
+  try { await loadModel(); }
+  catch (e) {
+    status.className = "banner warn";
+    status.textContent = "Could not load the in-browser model (" + e.message + "). The question buttons still work.";
+    modelLoading = null; throw e;
+  }
+  status.className = "hidden";
+  const out = await extractor([text], {pooling: "mean", normalize: true});
+  return out.tolist()[0];
 }
 const dot = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
 const cosine = (a, b) => dot(a, b) / (Math.sqrt(dot(a, a)) * Math.sqrt(dot(b, b)));
-
-// 2-D PCA of the stored question vectors (Jacobi eigen-decomposition of the small Gram matrix)
-function fitPCA(X) {
-  const n = X.length, d = X[0].length;
-  const mean = Array.from({length: d}, (_, j) => X.reduce((s, r) => s + r[j], 0) / n);
-  const C = X.map(r => r.map((x, j) => x - mean[j]));
-  const a = C.map(r => C.map(o => dot(r, o)));
-  const V = a.map((_, i) => a.map((_, j) => +(i === j)));
-  for (let sweep = 0; sweep < 100; sweep++) {
-    let off = 0;
-    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) off += a[i][j] ** 2;
-    if (off < 1e-18) break;
-    for (let p = 0; p < n; p++) for (let q = p + 1; q < n; q++) {
-      if (Math.abs(a[p][q]) < 1e-15) continue;
-      const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
-      const t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
-      const c = 1 / Math.sqrt(t * t + 1), sn = t * c;
-      for (let k = 0; k < n; k++) { const x = a[k][p], y = a[k][q]; a[k][p] = c * x - sn * y; a[k][q] = sn * x + c * y; }
-      for (let k = 0; k < n; k++) { const x = a[p][k], y = a[q][k]; a[p][k] = c * x - sn * y; a[q][k] = sn * x + c * y; }
-      for (let k = 0; k < n; k++) { const x = V[k][p], y = V[k][q]; V[k][p] = c * x - sn * y; V[k][q] = sn * x + c * y; }
-    }
-  }
-  const idx = [...Array(n).keys()].sort((i, j) => a[j][j] - a[i][i]).slice(0, 2);
-  const comps = idx.map(k => {
-    const v = Array.from({length: d}, (_, j) => C.reduce((s, r, i) => s + r[j] * V[i][k], 0));
-    const norm = Math.sqrt(dot(v, v)) || 1;
-    return v.map(x => x / norm);
-  });
-  return vec => comps.map(c => dot(vec.map((x, j) => x - mean[j]), c));
-}
-let project = null;
+const project = v => KB.pca.components.map(c => dot(v.map((x, j) => x - KB.pca.mean[j]), c));
 
 async function ask() {
   const question = $("q").value.trim();
-  if (!question || !extractor) return;
+  if (!question || !KB) return;
   document.body.classList.add("loading");
   try {
     const threshold = +$("thr").value, topK = +$("topk").value;
-    const [vector] = await embed([question]);
+    const vector = await embedQuestion(question);
     const sims = KB.vectors.map(v => cosine(vector, v));
     const order = [...sims.keys()].sort((i, j) => sims[j] - sims[i]);
     const best = order[0], hit = sims[best] >= threshold;
@@ -386,22 +372,10 @@ function renderTables() {
 }
 
 (async () => {
-  const status = $("status");
-  try {
-    const faq = await (await fetch("faq.json")).json();
-    status.textContent = "Loading the embedding model (all-MiniLM-L6-v2, ~90 MB the first time, then cached)…";
-    const {pipeline} = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1");
-    extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", {dtype: "fp32"});
-    status.textContent = "Embedding the dataset…";
-    const vectors = await embed(faq.map(f => f.question));
-    const answerVectors = await embed(faq.map(f => f.answer));
-    project = fitPCA(vectors);
-    KB = {faq, vectors, answerVectors, points: vectors.map(v => project(v))};
-  } catch (e) {
-    status.textContent = "Could not load the embedding model: " + e.message + ". Check your internet connection and reload.";
-    return;
-  }
-  status.classList.add("hidden");
+  try { KB = await (await fetch("kb.json")).json(); }
+  catch (e) { $("status").textContent = "Could not load kb.json: " + e.message; return; }
+  $("status").className = "hidden";
+  for (const [group, qs] of Object.entries(KB.variations)) addChips("variations", group, qs);
   // the dataset questions are the main buttons
   const qs = KB.faq.map(f => f.question), half = Math.ceil(qs.length / 2);
   addChips("examples", "Questions in the dataset", qs.slice(0, half));
