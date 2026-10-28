@@ -46,7 +46,7 @@
   .controls label { display: flex; align-items: center; gap: 10px; }
   .controls input[type=range] { width: 200px; accent-color: var(--blue); }
   .controls b { color: var(--text); font-variant-numeric: tabular-nums; min-width: 52px; display: inline-block; }
-  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 18px 0; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 18px 0; }
   .metric .label { color: var(--text-2); font-size: 13px; }
   .metric .value { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
   .badge { display: inline-flex; gap: 6px; align-items: center; padding: 2px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; }
@@ -76,6 +76,70 @@
   .formula { font-size: 18px; text-align: center; padding: 10px; font-family: "Times New Roman", serif; }
   .loading { opacity: .5; pointer-events: none; }
   .hidden { display: none; }
+
+  /* question buttons */
+  .chips { display: grid; gap: 6px; }
+  #examples { grid-template-columns: 1fr; }
+  #examples .chips { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+  .chip { margin: 0; }
+
+  /* similarity bars (HTML, so they fit any width) */
+  .bars { display: grid; gap: 10px; }
+  .bar-row { display: grid; grid-template-columns: minmax(0, 250px) minmax(0, 1fr) 64px; align-items: center; gap: 4px 12px; }
+  .bar-label { font-size: 14px; color: var(--text); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { position: relative; height: 18px; }
+  .bar-fill { position: absolute; top: 0; bottom: 0; background: var(--gray); border-radius: 4px; min-width: 2px; }
+  .bar-row.pass .bar-fill { background: var(--blue); }
+  .bar-thr { position: absolute; top: -6px; bottom: -6px; border-left: 2px dashed var(--orange); }
+  .bar-zero { position: absolute; top: -6px; bottom: -6px; border-left: 1px solid var(--border); }
+  .bar-val { font-size: 13px; color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-head .bar-track, .bar-axis .bar-track { height: 18px; }
+  .thr-label { position: absolute; bottom: 0; transform: translateX(-100%); padding-right: 6px; white-space: nowrap;
+               font-size: 13px; color: var(--orange); }
+  .tick { position: absolute; top: 0; transform: translateX(-50%); font-size: 12px; color: var(--muted); }
+  .bar-row:hover .bar-label { color: var(--blue); }
+
+  /* embedding strips (canvas, so they fit any width) */
+  .heat-row { margin-bottom: 10px; }
+  .heat-label { font-size: 13px; color: var(--text); margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .heat-strip { display: block; width: 100%; height: 28px; border-radius: 4px; cursor: crosshair; touch-action: pan-y; }
+  .heat-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+               font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .heat-legend { display: flex; align-items: center; gap: 6px; }
+  .heat-legend .grad { width: 120px; height: 10px; border-radius: 3px; }
+  .tip { position: fixed; z-index: 10; pointer-events: none; background: var(--surface); color: var(--text);
+         border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; font-size: 12px; max-width: 260px;
+         box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+  #rawTable td:first-child, #histTable td:first-child, #histTable td:nth-child(2) { min-width: 170px; }
+  .map-list { margin: 10px 0 0; padding-left: 22px; font-size: 13px; color: var(--text-2); columns: 2 220px; }
+  .map-list li { margin-bottom: 3px; break-inside: avoid; }
+  #contribTitle { margin: 18px 0 4px; font-size: 14px; }
+
+  @media (max-width: 900px) { .tabs { flex-wrap: wrap; overflow: visible; } }
+
+  /* phones */
+  @media (max-width: 600px) {
+    body { font-size: 14px; }
+    h1 { font-size: 22px; }
+    .sub { font-size: 14px; }
+    .card { padding: 14px; }
+    button.primary { padding: 12px 16px; }
+    .chips, #examples .chips { display: flex; flex-wrap: wrap; }
+    .chip { width: auto; display: inline-block; font-size: 13px; padding: 6px 10px; }
+    .examples { gap: 12px; }
+    .controls { gap: 12px; }
+    .controls label, .controls > span { width: 100%; justify-content: space-between; }
+    .controls input[type=range] { flex: 1; width: auto !important; min-width: 0; }
+    .metrics { grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
+    .metric .value { font-size: 22px; }
+    .answer { font-size: 16px; }
+    .tabs { flex-wrap: wrap; overflow: visible; }
+    .tab { padding: 8px 10px; font-size: 13px; }
+    .formula { font-size: 15px; }
+    .bar-row { grid-template-columns: minmax(0, 1fr) 56px; }
+    .bar-label { grid-column: 1 / -1; text-align: left; white-space: normal; font-size: 13px; }
+    .bar-head .bar-label, .bar-axis .bar-label { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -130,14 +194,14 @@
     </div>
 
     <div class="panel active card" id="p-sim">
-      <div id="simChart" style="height:440px"></div>
+      <div id="simChart" class="bars"></div>
       <p class="note">Blue bars are at or above the threshold (answered from the dataset). Gray bars are below it. The dashed line is the threshold.</p>
     </div>
 
     <div class="panel card" id="p-emb">
       <div id="heatChart"></div>
-      <p class="note">Each row is one 384-number vector: the prompt, its closest stored questions and, on a dataset match, the stored answer.
-        Blue = negative, orange = positive. Similar meaning gives a similar pattern. Hover a cell for its exact value.</p>
+      <p class="note">Each strip is one 384-number vector: the prompt, its closest stored questions and, on a dataset match, the stored answer.
+        Blue = negative, orange = positive. Similar meaning gives a similar pattern. Hover or tap a strip for the exact value.</p>
       <h4 style="margin:18px 0 6px">Raw vectors (first 12 dimensions)</h4>
       <div class="scroll"><table id="rawTable"></table></div>
       <h4 style="margin:18px 0 6px">Full prompt vector (384 numbers)</h4>
@@ -145,7 +209,8 @@
     </div>
 
     <div class="panel card" id="p-map">
-      <div id="mapChart" style="height:560px"></div>
+      <div id="mapChart"></div>
+      <ol id="mapList" class="map-list hidden"></ol>
       <p class="note">The 384-dimensional vectors flattened to 2-D with PCA, so distances are approximate.
         Dotted lines join the prompt (orange star) to the questions sent as context.</p>
     </div>
@@ -154,7 +219,8 @@
       <div class="formula">cos(θ) = (A · B) / (‖A‖ × ‖B‖) = Σ A<sub>i</sub>B<sub>i</sub> / ( √ΣA<sub>i</sub>² × √ΣB<sub>i</sub>² )</div>
       <p class="note" id="mathAB" style="text-align:center"></p>
       <div class="metrics" id="mathMetrics"></div>
-      <div id="contribChart" style="height:320px"></div>
+      <h4 id="contribTitle"></h4>
+      <div id="contribChart" style="height:300px"></div>
       <div class="scroll"><table id="contribTable"></table></div>
     </div>
 
@@ -185,7 +251,7 @@ const cfg = {displayModeBar: false, responsive: true};
 // ---- question buttons / controls ----
 function addChips(target, title, qs) {
   const div = document.createElement("div");
-  div.innerHTML = `<h4>${esc(title)}</h4>` + qs.map(q => `<button class="chip" type="button">${esc(q)}</button>`).join("");
+  div.innerHTML = `<h4>${esc(title)}</h4><div class="chips">` + qs.map(q => `<button class="chip" type="button">${esc(q)}</button>`).join("") + "</div>";
   div.querySelectorAll(".chip").forEach((b, i) => b.onclick = () => { $("q").value = qs[i]; ask(); });
   $(target).appendChild(div);
 }
@@ -196,8 +262,24 @@ $("askForm").onsubmit = e => { e.preventDefault(); ask(); };
 document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
   document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "p-" + t.dataset.tab));
-  document.querySelectorAll("#p-" + t.dataset.tab + " .js-plotly-plot").forEach(el => Plotly.Plots.resize(el));
+  if (last) renderPanel(t.dataset.tab);
 });
+function renderPanel(tab) {
+  if (tab === "sim") renderSim();
+  if (tab === "emb") renderHeat();
+  if (tab === "map") renderMap();
+  if (tab === "math") renderMath();
+  // Plotly keeps the size it had while the tab was hidden; recompute it now that it's visible
+  document.querySelectorAll("#p-" + tab + " .js-plotly-plot").forEach(el => Plotly.Plots.resize(el));
+}
+let resizeTimer, lastWidth = innerWidth;
+addEventListener("resize", () => {
+  if (innerWidth === lastWidth) return;  // ignore mobile address-bar height changes
+  lastWidth = innerWidth;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (last) renderPanel(document.querySelector(".tab.active").dataset.tab); }, 150);
+});
+const narrow = (el, limit = 600) => (el.clientWidth || innerWidth) < limit;
 
 // ---- RAG logic ----
 // Dataset + button embeddings are pre-computed locally (build_kb.py -> kb.json).
@@ -284,22 +366,24 @@ function render() {
 }
 
 function renderSim() {
-  const d = last, faq = KB.faq, ord = [...d.order].reverse();
-  const xs = ord.map(i => d.sims[i]);
-  Plotly.react("simChart", [{
-    type: "bar", orientation: "h", x: xs, y: ord.map(i => faq[i].question),
-    marker: {color: ord.map(i => d.sims[i] >= d.threshold ? css("--blue") : css("--gray")), cornerradius: 4},
-    text: xs.map(x => pct(x)), textposition: "outside", textfont: {color: css("--text")}, cliponaxis: false,
-    hovertemplate: "%{y}<br>cosine similarity = %{x:.4f}<extra></extra>",
-  }], layoutBase({
-    bargap: 0.35, margin: {l: 10, r: 60, t: 30, b: 40},
-    xaxis: axis({range: [Math.min(0, Math.min(...xs) - 0.05), 1.08], title: {text: "cosine similarity"}}),
-    yaxis: axis({tickfont: {color: css("--text")}}),
-    shapes: [{type: "line", x0: d.threshold, x1: d.threshold, y0: 0, y1: 1, yref: "paper",
-              line: {color: css("--orange"), width: 2, dash: "dash"}}],
-    annotations: [{x: d.threshold, y: 1.02, yref: "paper", text: "threshold " + pct(d.threshold, 1), showarrow: false,
-                   font: {color: css("--orange")}, xanchor: "right", yanchor: "bottom"}],
-  }), cfg);
+  const d = last, faq = KB.faq;
+  const lo = Math.min(0, Math.min(...d.sims) - 0.02), pos = x => ((x - lo) / (1 - lo) * 100).toFixed(2) + "%";
+  const zero = pos(0), thr = pos(d.threshold);
+  const head = `<div class="bar-row bar-head"><div class="bar-label"></div><div class="bar-track">
+      <div class="thr-label" style="left:${thr}">threshold ${pct(d.threshold, 1)}</div></div><div></div></div>`;
+  const rows = d.order.map(i => {
+    const s = d.sims[i], a = Math.min(s, 0), b = Math.max(s, 0);
+    return `<div class="bar-row${s >= d.threshold ? " pass" : ""}" title="${esc(faq[i].question)}\ncosine similarity = ${s.toFixed(4)}">
+      <div class="bar-label">${esc(faq[i].question)}</div>
+      <div class="bar-track"><div class="bar-zero" style="left:${zero}"></div>
+        <div class="bar-fill" style="left:${pos(a)};width:calc(${pos(b)} - ${pos(a)})"></div>
+        <div class="bar-thr" style="left:${thr}"></div></div>
+      <div class="bar-val">${pct(s)}</div></div>`;
+  }).join("");
+  const ticks = lo < -0.15 ? [+lo.toFixed(2), 0, 0.5, 1] : [0, 0.5, 1];
+  const axisRow = `<div class="bar-row bar-axis"><div class="bar-label"></div><div class="bar-track">
+      ${ticks.map(t => `<span class="tick" style="left:${pos(t)}">${t}</span>`).join("")}</div><div></div></div>`;
+  $("simChart").innerHTML = head + rows + axisRow;
 }
 
 function heatRows() {
@@ -310,16 +394,34 @@ function heatRows() {
   return rows;
 }
 
+function hexRgb(h) { h = h.replace("#", ""); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); }
 function renderHeat() {
   const rows = heatRows(), z = rows.map(r => r.v);
   const lim = Math.max(...z.flat().map(Math.abs));
-  Plotly.react("heatChart", [{
-    type: "heatmap", z, y: rows.map(r => r.label.slice(0, 60)), x: [...Array(z[0].length).keys()],
-    colorscale: [[0, css("--blue")], [0.5, css("--neutral")], [1, css("--orange")]], zmin: -lim, zmax: lim,
-    hovertemplate: "%{y}<br>dimension %{x}: %{z:+.4f}<extra></extra>", colorbar: {thickness: 12, title: {text: "value"}},
-    ygap: 3,
-  }], layoutBase({height: 110 + 52 * rows.length, xaxis: axis({title: {text: "embedding dimension (0–383)"}}),
-                  yaxis: axis({autorange: "reversed", tickfont: {color: css("--text")}})}), cfg);
+  const neg = hexRgb(css("--blue")), mid = hexRgb(css("--neutral")), posc = hexRgb(css("--orange"));
+  const color = v => { const t = Math.min(1, Math.abs(v) / lim), c = v < 0 ? neg : posc;
+    return `rgb(${mid.map((m, k) => Math.round(m + (c[k] - m) * t)).join(",")})`; };
+  $("heatChart").innerHTML = rows.map(r => `<div class="heat-row"><div class="heat-label" title="${esc(r.label)}">${esc(r.label)}</div>
+      <canvas class="heat-strip"></canvas></div>`).join("") +
+    `<div class="heat-foot"><span>dimension 0</span><span class="heat-legend">${(-lim).toFixed(2)}
+      <span class="grad" style="background:linear-gradient(90deg, ${css("--blue")}, ${css("--neutral")}, ${css("--orange")})"></span>+${lim.toFixed(2)}</span><span>383</span></div>`;
+  const tip = $("tip");
+  $("heatChart").querySelectorAll("canvas").forEach((cv, r) => {
+    const v = z[r], w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio || 1;
+    if (!w) return;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext("2d");
+    v.forEach((x, k) => { ctx.fillStyle = color(x);
+      const x0 = Math.floor(k * cv.width / v.length), x1 = Math.floor((k + 1) * cv.width / v.length);
+      ctx.fillRect(x0, 0, Math.max(1, x1 - x0), cv.height); });
+    const show = e => { const rc = cv.getBoundingClientRect(), k = Math.min(v.length - 1, Math.max(0, Math.floor((e.clientX - rc.left) / rc.width * v.length)));
+      tip.innerHTML = `${esc(rows[r].label)}<br><b>dimension ${k}: ${v[k] >= 0 ? "+" : ""}${v[k].toFixed(4)}</b>`;
+      tip.classList.remove("hidden");
+      const tx = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8);
+      tip.style.left = Math.max(8, tx) + "px"; tip.style.top = (e.clientY - tip.offsetHeight - 12) + "px"; };
+    cv.onpointermove = show; cv.onpointerdown = show;
+    cv.onpointerleave = () => tip.classList.add("hidden");
+  });
 
   const n = 12;
   $("rawTable").innerHTML = "<tr><th>Vector</th>" + [...Array(n).keys()].map(j => `<th class="num">d${j}</th>`).join("") + "<th class='num'>…</th></tr>" +
@@ -328,31 +430,38 @@ function renderHeat() {
 }
 
 function renderMap() {
-  const d = last, faq = KB.faq, P = KB.points, q = d.point;
+  const d = last, faq = KB.faq, P = KB.points, q = d.point, small = narrow($("mapChart"), 860);
   const all = [...P, q], xs = all.map(p => p[0]), ys = all.map(p => p[1]);
   const pad = (a, f) => { const lo = Math.min(...a), hi = Math.max(...a), w = hi - lo || 1; return [lo - w * f, hi + w * f]; };
-  const xr = pad(xs, 0.25), yr = pad(ys, 0.15);
+  const xr = pad(xs, small ? 0.08 : 0.25), yr = pad(ys, small ? 0.08 : 0.15);
   // stagger labels of points that sit close together so they don't overlap
   const pos = P.map(() => "top center");
   P.forEach((p, i) => P.forEach((o, j) => {
     if (j < i && Math.abs(p[0] - o[0]) < (xr[1] - xr[0]) * 0.18 && Math.abs(p[1] - o[1]) < (yr[1] - yr[0]) * 0.1)
       pos[i] = pos[j] === "top center" ? "bottom center" : "top center";
   }));
+  $("mapChart").style.height = (small ? 420 : 560) + "px";
   const lines = d.top.map(i => ({type: "scatter", mode: "lines", x: [q[0], P[i][0]], y: [q[1], P[i][1]],
     line: {color: css("--muted"), width: 2, dash: "dot"}, hoverinfo: "skip", showlegend: false}));
   Plotly.react("mapChart", [...lines, {
     type: "scatter", mode: "markers+text", name: "Stored questions", x: P.map(p => p[0]), y: P.map(p => p[1]),
-    text: faq.map(f => f.question), textposition: pos, textfont: {color: css("--text-2"), size: 12},
-    customdata: d.sims, marker: {size: 12, color: css("--blue"), line: {color: css("--surface"), width: 2}},
-    hovertemplate: "%{text}<br>similarity to prompt = %{customdata:.4f}<extra></extra>",
+    text: small ? faq.map((_, i) => String(i + 1)) : faq.map(f => f.question),
+    textposition: small ? "middle center" : pos,
+    textfont: small ? {color: "#ffffff", size: 10} : {color: css("--text-2"), size: 12},
+    customdata: faq.map((f, i) => [f.question, d.sims[i]]),
+    marker: {size: small ? 20 : 12, color: css("--blue"), line: {color: css("--surface"), width: 2}},
+    hovertemplate: "%{customdata[0]}<br>similarity to prompt = %{customdata[1]:.4f}<extra></extra>",
   }, {
-    type: "scatter", mode: "markers+text", name: "Your prompt", x: [q[0]], y: [q[1]], text: [d.question],
-    textposition: "middle right", textfont: {color: css("--text"), size: 13},
+    type: "scatter", mode: small ? "markers" : "markers+text", name: "Your prompt", x: [q[0]], y: [q[1]], text: [d.question],
+    textposition: q[0] > (xr[0] + xr[1]) / 2 ? "middle left" : "middle right", textfont: {color: css("--text"), size: 13},
     marker: {size: 20, symbol: "star", color: css("--orange"), line: {color: css("--surface"), width: 2}},
     hovertemplate: "PROMPT: %{text}<extra></extra>",
   }], layoutBase({xaxis: axis({title: {text: "PCA component 1"}, zeroline: false, range: xr}),
                   yaxis: axis({title: {text: "PCA component 2"}, zeroline: false, range: yr}),
-                  legend: {orientation: "h", y: 1.06, x: 0}, margin: {l: 10, r: 10, t: 40, b: 40}}), cfg);
+                  legend: {orientation: "h", x: 0, y: 1, yanchor: "bottom"},
+                  margin: {l: 10, r: 10, t: small ? 56 : 40, b: 40}}), cfg);
+  $("mapList").classList.toggle("hidden", !small);
+  $("mapList").innerHTML = faq.map((f, i) => `<li>${esc(f.question)} <span style="color:var(--muted)">(${pct(d.sims[i])})</span></li>`).join("");
 }
 
 function renderMath() {
@@ -364,13 +473,14 @@ function renderMath() {
   $("mathMetrics").innerHTML = [["A · B (dot product)", dot.toFixed(4)], ["‖A‖ (prompt length)", nA.toFixed(4)],
     ["‖B‖ (match length)", nB.toFixed(4)], ["cosine similarity", (dot / (nA * nB)).toFixed(4)]]
     .map(([l, v]) => `<div class="card metric"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
-  const top = [...prod.keys()].sort((i, j) => Math.abs(prod[j]) - Math.abs(prod[i])).slice(0, 20);
+  const nTop = narrow($("contribChart")) ? 10 : 20;
+  const top = [...prod.keys()].sort((i, j) => Math.abs(prod[j]) - Math.abs(prod[i])).slice(0, nTop);
+  $("contribTitle").textContent = `The ${nTop} dimensions that add the most to A · B (blue adds, orange subtracts)`;
   Plotly.react("contribChart", [{
     type: "bar", x: top.map(i => "d" + i), y: top.map(i => prod[i]),
     marker: {color: top.map(i => prod[i] >= 0 ? css("--blue") : css("--orange")), cornerradius: 4},
     hovertemplate: "%{x}<br>A×B = %{y:+.5f}<extra></extra>",
-  }], layoutBase({title: {text: "The 20 dimensions that add the most to A · B (blue adds, orange subtracts)", font: {size: 14, color: css("--text")}, x: 0},
-                  margin: {l: 10, r: 10, t: 40, b: 40}, xaxis: axis({type: "category"}), yaxis: axis({title: {text: "A_i × B_i"}})}), cfg);
+  }], layoutBase({margin: {l: 10, r: 10, t: 10, b: 40}, xaxis: axis({type: "category"}), yaxis: axis({title: {text: "A_i × B_i"}})}), cfg);
   const f = x => (x >= 0 ? "+" : "") + x.toFixed(4);
   $("contribTable").innerHTML = "<tr><th>dimension</th><th class='num'>A (prompt)</th><th class='num'>B (match)</th><th class='num'>A × B</th></tr>" +
     top.map(i => `<tr><td>d${i}</td><td class="num">${f(A[i])}</td><td class="num">${f(B[i])}</td><td class="num">${(prod[i] >= 0 ? "+" : "") + prod[i].toFixed(5)}</td></tr>`).join("");
@@ -388,9 +498,7 @@ function renderTables() {
   $("status").className = "hidden";
   for (const [group, qs] of Object.entries(KB.variations)) addChips("variations", group, qs);
   // the dataset questions are the main buttons
-  const qs = KB.faq.map(f => f.question), half = Math.ceil(qs.length / 2);
-  addChips("examples", "Questions in the dataset", qs.slice(0, half));
-  addChips("examples", "\u00a0", qs.slice(half));
+  addChips("examples", "Questions in the dataset", KB.faq.map(f => f.question));
   $("dataTable").innerHTML = "<tr><th>#</th><th>Question (embedded)</th><th>Answer</th></tr>" +
     KB.faq.map((f, i) => `<tr><td>${i + 1}</td><td>${esc(f.question)}</td><td>${esc(f.answer)}</td></tr>`).join("");
   ask();
@@ -400,5 +508,6 @@ function renderTables() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => last && render());
 })();
 </script>
+<div id="tip" class="tip hidden"></div>
 </body>
 </html>
