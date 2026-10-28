@@ -1,0 +1,22 @@
+[
+  {"question": "What is RAG?",
+   "answer": "RAG (Retrieval-Augmented Generation) retrieves relevant documents from a knowledge base and passes them to an LLM so its answer is grounded in your own data."},
+  {"question": "What is an embedding?",
+   "answer": "An embedding is a list of numbers (a vector) that represents the meaning of a piece of text. Texts with similar meaning have vectors that point in similar directions."},
+  {"question": "What is cosine similarity?",
+   "answer": "Cosine similarity measures the angle between two vectors: 1.0 means identical direction (same meaning), 0 means unrelated, -1 means opposite."},
+  {"question": "What is a vector database?",
+   "answer": "A vector database stores embeddings and lets you quickly find the vectors closest to a query vector. Examples: Pinecone, Weaviate, Chroma, FAISS, pgvector."},
+  {"question": "Why do LLMs hallucinate?",
+   "answer": "LLMs predict likely text, not verified facts. Without grounding data they can produce fluent but wrong answers. RAG reduces this by supplying real context."},
+  {"question": "What is chunking in RAG?",
+   "answer": "Chunking splits large documents into smaller pieces (e.g. 200-500 tokens) before embedding, so retrieval returns focused, relevant passages."},
+  {"question": "What is semantic caching?",
+   "answer": "Semantic caching stores previous question/answer pairs. If a new question is nearly identical in meaning (very high similarity), the cached answer is returned without calling the LLM, saving cost and latency."},
+  {"question": "How do I reset my password?",
+   "answer": "Go to Settings > Account > Reset Password, enter your email, and follow the link sent to your inbox."},
+  {"question": "What are your support hours?",
+   "answer": "Support is available Monday to Friday, 9am to 6pm."},
+  {"question": "How do I cancel my subscription?",
+   "answer": "Go to Settings > Billing > Cancel Subscription. Your plan stays active until the end of the billing period."}
+]

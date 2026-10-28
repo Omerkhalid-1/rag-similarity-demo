@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAG Similarity Dashboard</title>
+<script src="plotly.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f6f4; --surface: #fcfcfb; --border: #e3e2dd;
+    --text: #0b0b0b; --text-2: #52514e; --muted: #8a8984;
+    --blue: #2a78d6; --orange: #eb6834; --gray: #c3c2bb; --neutral: #f0efec;
+    --good-bg: #e6f4ea; --good: #1e7b34; --info-bg: #eaf1fb; --info: #1f5fae;
+    --warn-bg: #fdf3e1; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121211; --surface: #1a1a19; --border: #2e2e2c;
+      --text: #ffffff; --text-2: #c3c2b7; --muted: #8a8984;
+      --blue: #3987e5; --orange: #d95926; --gray: #4a4a46; --neutral: #383835;
+      --good-bg: #16301e; --good: #7fd393; --info-bg: #15263d; --info: #8ab8f0;
+      --warn-bg: #33270f; --warn: #f0c46b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  .sub { color: var(--text-2); margin: 0 0 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .ask { display: flex; gap: 8px; }
+  .ask input { flex: 1; min-width: 0; font: inherit; font-size: 17px; padding: 12px 14px; border-radius: 10px;
+               border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .ask input:focus { outline: 2px solid var(--blue); outline-offset: -1px; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--border);
+           background: var(--surface); color: var(--text); padding: 8px 12px; }
+  button.primary { background: var(--blue); border-color: var(--blue); color: #fff; padding: 12px 22px; font-weight: 600; }
+  .examples { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-top: 16px; }
+  .examples h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .chip { display: block; width: 100%; text-align: left; margin-bottom: 6px; font-size: 14px; padding: 6px 10px; }
+  .chip:hover { border-color: var(--blue); }
+  .controls { display: flex; gap: 28px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+              color: var(--text-2); font-size: 14px; align-items: center; }
+  .controls label { display: flex; align-items: center; gap: 10px; }
+  .controls input[type=range] { width: 200px; accent-color: var(--blue); }
+  .controls b { color: var(--text); font-variant-numeric: tabular-nums; min-width: 52px; display: inline-block; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 18px 0; }
+  .metric .label { color: var(--text-2); font-size: 13px; }
+  .metric .value { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .badge { display: inline-flex; gap: 6px; align-items: center; padding: 2px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+  .badge.dataset { background: var(--good-bg); color: var(--good); }
+  .badge.llm { background: var(--info-bg); color: var(--info); }
+  .banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; }
+  .banner.dataset { background: var(--good-bg); color: var(--good); }
+  .banner.llm { background: var(--info-bg); color: var(--info); }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .answer { font-size: 17px; border-left: 3px solid var(--blue); padding: 4px 0 4px 14px; margin: 8px 0 0; }
+  .transfer { font-size: 20px; font-weight: 650; color: var(--info); margin: 2px 0 4px; }
+  .ctx { margin: 8px 0 0; padding-left: 18px; color: var(--text-2); }
+  .tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .tab { border: none; background: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 10px 14px;
+         color: var(--text-2); white-space: nowrap; }
+  .tab.active { color: var(--text); border-bottom-color: var(--blue); font-weight: 600; }
+  .panel { display: none; padding-top: 14px; }
+  .panel.active { display: block; }
+  .note { color: var(--text-2); font-size: 13px; margin: 6px 0 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--text-2); font-weight: 600; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  pre { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 12px;
+        white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto; }
+  .formula { font-size: 18px; text-align: center; padding: 10px; font-family: "Times New Roman", serif; }
+  .loading { opacity: .5; pointer-events: none; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>RAG similarity dashboard</h1>
+  <p class="sub">Each question is turned into a 384-number embedding and compared with every stored question using cosine
+    similarity. If the best match is at or above the threshold, the stored answer is returned. Otherwise the request is
+    transferred to the LLM.</p>
+
+  <div class="card">
+    <form class="ask" id="askForm">
+      <input id="q" placeholder="Ask a question…" value="What is RAG?" autocomplete="off">
+      <button class="primary" type="submit">Ask</button>
+    </form>
+    <div class="examples" id="examples"></div>
+    <div class="examples" id="variations"></div>
+    <div class="controls">
+      <label>Similarity threshold <input type="range" id="thr" min="0.80" max="1" step="0.005" value="0.99"> <b id="thrVal">99.0%</b></label>
+      <label>Q&amp;A pairs passed to the LLM <input type="range" id="topk" min="1" max="5" step="1" value="3" style="width:120px"> <b id="topkVal">3</b></label>
+    </div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="metrics">
+      <div class="card metric"><div class="label">Best similarity</div><div class="value" id="mBest"></div></div>
+      <div class="card metric"><div class="label">Threshold</div><div class="value" id="mThr"></div></div>
+      <div class="card metric"><div class="label">Gap to threshold</div><div class="value" id="mGap"></div></div>
+      <div class="card metric"><div class="label">Route</div><div class="value" id="mRoute"></div></div>
+    </div>
+
+    <div class="card">
+      <div id="banner" class="banner"></div>
+      <div id="answerBox"><strong>Answer</strong> <span class="badge dataset">from dataset</span>
+        <p class="answer" id="answer"></p></div>
+      <div id="transferBox" class="hidden">
+        <div class="transfer">↗ Request transferred to the LLM</div>
+        <p class="note">The dataset has no question at or above the threshold, so this request would be handed to an LLM with the
+          closest Q&amp;A pairs as context (no LLM is called in this demo).</p>
+        <p class="note" style="margin-top:12px"><strong>Context passed to the LLM:</strong></p><ul class="ctx" id="ctx"></ul>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="sim">Cosine similarity</button>
+      <button class="tab" data-tab="emb">Embeddings</button>
+      <button class="tab" data-tab="map">Embedding map</button>
+      <button class="tab" data-tab="math">How the score is computed</button>
+      <button class="tab" data-tab="hist">History</button>
+      <button class="tab" data-tab="data">Dataset</button>
+    </div>
+
+    <div class="panel active card" id="p-sim">
+      <div id="simChart" style="height:440px"></div>
+      <p class="note">Blue bars are at or above the threshold (answered from the dataset). Gray bars are below it. The dashed line is the threshold.</p>
+    </div>
+
+    <div class="panel card" id="p-emb">
+      <div id="heatChart"></div>
+      <p class="note">Each row is one 384-number vector: the prompt, its closest stored questions and, on a dataset match, the stored answer.
+        Blue = negative, orange = positive. Similar meaning gives a similar pattern. Hover a cell for its exact value.</p>
+      <h4 style="margin:18px 0 6px">Raw vectors (first 12 dimensions)</h4>
+      <div class="scroll"><table id="rawTable"></table></div>
+      <h4 style="margin:18px 0 6px">Full prompt vector (384 numbers)</h4>
+      <pre id="fullVec"></pre>
+    </div>
+
+    <div class="panel card" id="p-map">
+      <div id="mapChart" style="height:560px"></div>
+      <p class="note">The 384-dimensional vectors flattened to 2-D with PCA, so distances are approximate.
+        Dotted lines join the prompt (orange star) to the questions sent as context.</p>
+    </div>
+
+    <div class="panel card" id="p-math">
+      <div class="formula">cos(θ) = (A · B) / (‖A‖ × ‖B‖) = Σ A<sub>i</sub>B<sub>i</sub> / ( √ΣA<sub>i</sub>² × √ΣB<sub>i</sub>² )</div>
+      <p class="note" id="mathAB" style="text-align:center"></p>
+      <div class="metrics" id="mathMetrics"></div>
+      <div id="contribChart" style="height:320px"></div>
+      <div class="scroll"><table id="contribTable"></table></div>
+    </div>
+
+    <div class="panel card" id="p-hist"><div class="scroll"><table id="histTable"></table></div></div>
+    <div class="panel card" id="p-data"><div class="scroll"><table id="dataTable"></table></div>
+      <p class="note">Only the questions are embedded and searched. Edit faq.json and restart the server to change the dataset.</p></div>
+  </div>
+</div>
+
+<script>
+// Variations of the dataset questions, to show what happens near / below the threshold
+const VARIATIONS = {
+  "Near duplicate (high similarity)": ["What is RAG", "How do I reset my password", "What are your support hours"],
+  "Paraphrase → transferred to LLM": ["How can I change my password?", "How can I cancel my plan?", "Why does an LLM make things up?"],
+  "Off-topic → transferred to LLM": ["What's the weather today?", "Who won the World Cup?"],
+};
+let KB = null, last = null, history = [];
+const $ = id => document.getElementById(id);
+const pct = (x, d = 2) => (x * 100).toFixed(d) + "%";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+function layoutBase(extra = {}) {
+  return Object.assign({
+    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
+    font: {color: css("--text-2"), family: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif", size: 13},
+    margin: {l: 10, r: 20, t: 20, b: 40},
+    hoverlabel: {bgcolor: css("--surface"), bordercolor: css("--border"), font: {color: css("--text")}},
+  }, extra);
+}
+const axis = (extra = {}) => Object.assign({gridcolor: css("--border"), zerolinecolor: css("--border"), linecolor: css("--border"), automargin: true}, extra);
+const cfg = {displayModeBar: false, responsive: true};
+
+// ---- question buttons / controls ----
+function addChips(target, title, qs) {
+  const div = document.createElement("div");
+  div.innerHTML = `<h4>${esc(title)}</h4>` + qs.map(q => `<button class="chip" type="button">${esc(q)}</button>`).join("");
+  div.querySelectorAll(".chip").forEach((b, i) => b.onclick = () => { $("q").value = qs[i]; ask(); });
+  $(target).appendChild(div);
+}
+for (const [group, qs] of Object.entries(VARIATIONS)) addChips("variations", group, qs);
+let debounce;
+$("thr").oninput = () => { $("thrVal").textContent = pct(+$("thr").value, 1); clearTimeout(debounce); debounce = setTimeout(() => last && ask(), 250); };
+$("topk").oninput = () => { $("topkVal").textContent = $("topk").value; clearTimeout(debounce); debounce = setTimeout(() => last && ask(), 250); };
+$("askForm").onsubmit = e => { e.preventDefault(); ask(); };
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === "p-" + t.dataset.tab));
+  document.querySelectorAll("#p-" + t.dataset.tab + " .js-plotly-plot").forEach(el => Plotly.Plots.resize(el));
+});
+
+async function ask() {
+  const question = $("q").value.trim();
+  if (!question) return;
+  document.body.classList.add("loading");
+  try {
+    const r = await fetch("/api/ask", {method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({question, threshold: +$("thr").value, top_k: +$("topk").value})});
+    last = await r.json();
+    const h = history[0];
+    if (!h || h.question !== last.question || h.threshold !== last.threshold)
+      history.unshift({question: last.question, match: KB.faq[last.best].question, sim: last.sims[last.best],
+                       threshold: last.threshold, route: last.route});
+    render();
+  } finally { document.body.classList.remove("loading"); }
+}
+
+function render() {
+  const d = last, faq = KB.faq, best = d.best, s = d.sims[best], hit = d.route === "dataset";
+  $("result").classList.remove("hidden");
+  $("mBest").textContent = pct(s);
+  $("mThr").textContent = pct(d.threshold, 1);
+  $("mGap").textContent = (s - d.threshold >= 0 ? "+" : "") + pct(s - d.threshold);
+  $("mRoute").innerHTML = hit ? '<span class="badge dataset">✓ Dataset</span>' : '<span class="badge llm">↗ Transfer to LLM</span>';
+
+  const b = $("banner");
+  b.className = "banner " + (hit ? "dataset" : "llm");
+  b.innerHTML = hit
+    ? `<strong>✓ Match ≥ ${pct(d.threshold, 1)}</strong> with “${esc(faq[best].question)}” (${pct(s)}). Returning the stored answer, no LLM call.`
+    : `<strong>↗ Below ${pct(d.threshold, 1)}.</strong> Closest is “${esc(faq[best].question)}” at ${pct(s)}. Transferring the request to the LLM.`;
+  $("answerBox").classList.toggle("hidden", !hit);
+  $("transferBox").classList.toggle("hidden", hit);
+  if (hit) $("answer").textContent = d.answer;
+  $("ctx").innerHTML = d.top.map(i => `<li><strong>${esc(faq[i].question)}</strong> (${pct(d.sims[i])}): ${esc(faq[i].answer)}</li>`).join("");
+
+  renderSim(); renderHeat(); renderMap(); renderMath(); renderTables();
+}
+
+function renderSim() {
+  const d = last, faq = KB.faq, ord = [...d.order].reverse();
+  const xs = ord.map(i => d.sims[i]);
+  Plotly.react("simChart", [{
+    type: "bar", orientation: "h", x: xs, y: ord.map(i => faq[i].question),
+    marker: {color: ord.map(i => d.sims[i] >= d.threshold ? css("--blue") : css("--gray")), cornerradius: 4},
+    text: xs.map(x => pct(x)), textposition: "outside", textfont: {color: css("--text")}, cliponaxis: false,
+    hovertemplate: "%{y}<br>cosine similarity = %{x:.4f}<extra></extra>",
+  }], layoutBase({
+    bargap: 0.35, margin: {l: 10, r: 60, t: 30, b: 40},
+    xaxis: axis({range: [Math.min(0, Math.min(...xs) - 0.05), 1.08], title: {text: "cosine similarity"}}),
+    yaxis: axis({tickfont: {color: css("--text")}}),
+    shapes: [{type: "line", x0: d.threshold, x1: d.threshold, y0: 0, y1: 1, yref: "paper",
+              line: {color: css("--orange"), width: 2, dash: "dash"}}],
+    annotations: [{x: d.threshold, y: 1.02, yref: "paper", text: "threshold " + pct(d.threshold, 1), showarrow: false,
+                   font: {color: css("--orange")}, xanchor: "right", yanchor: "bottom"}],
+  }), cfg);
+}
+
+function heatRows() {
+  const d = last, faq = KB.faq;
+  const rows = [{label: "PROMPT: " + d.question, v: d.vector}];
+  d.top.forEach(i => rows.push({label: pct(d.sims[i]) + " · " + faq[i].question, v: KB.vectors[i]}));
+  if (d.route === "dataset") rows.push({label: "ANSWER: " + faq[d.best].answer.slice(0, 45) + "…", v: d.answer_vector});
+  return rows;
+}
+
+function renderHeat() {
+  const rows = heatRows(), z = rows.map(r => r.v);
+  const lim = Math.max(...z.flat().map(Math.abs));
+  Plotly.react("heatChart", [{
+    type: "heatmap", z, y: rows.map(r => r.label.slice(0, 60)), x: [...Array(z[0].length).keys()],
+    colorscale: [[0, css("--blue")], [0.5, css("--neutral")], [1, css("--orange")]], zmin: -lim, zmax: lim,
+    hovertemplate: "%{y}<br>dimension %{x}: %{z:+.4f}<extra></extra>", colorbar: {thickness: 12, title: {text: "value"}},
+    ygap: 3,
+  }], layoutBase({height: 110 + 52 * rows.length, xaxis: axis({title: {text: "embedding dimension (0–383)"}}),
+                  yaxis: axis({autorange: "reversed", tickfont: {color: css("--text")}})}), cfg);
+
+  const n = 12;
+  $("rawTable").innerHTML = "<tr><th>Vector</th>" + [...Array(n).keys()].map(j => `<th class="num">d${j}</th>`).join("") + "<th class='num'>…</th></tr>" +
+    rows.map(r => `<tr><td>${esc(r.label.slice(0, 55))}</td>` + r.v.slice(0, n).map(x => `<td class="num">${x >= 0 ? "+" : ""}${x.toFixed(4)}</td>`).join("") + "<td class='num'>…</td></tr>").join("");
+  $("fullVec").textContent = "[" + last.vector.map(x => x.toFixed(4)).join(", ") + "]";
+}
+
+function renderMap() {
+  const d = last, faq = KB.faq, P = KB.points, q = d.point;
+  const all = [...P, q], xs = all.map(p => p[0]), ys = all.map(p => p[1]);
+  const pad = (a, f) => { const lo = Math.min(...a), hi = Math.max(...a), w = hi - lo || 1; return [lo - w * f, hi + w * f]; };
+  const xr = pad(xs, 0.25), yr = pad(ys, 0.15);
+  // stagger labels of points that sit close together so they don't overlap
+  const pos = P.map(() => "top center");
+  P.forEach((p, i) => P.forEach((o, j) => {
+    if (j < i && Math.abs(p[0] - o[0]) < (xr[1] - xr[0]) * 0.18 && Math.abs(p[1] - o[1]) < (yr[1] - yr[0]) * 0.1)
+      pos[i] = pos[j] === "top center" ? "bottom center" : "top center";
+  }));
+  const lines = d.top.map(i => ({type: "scatter", mode: "lines", x: [q[0], P[i][0]], y: [q[1], P[i][1]],
+    line: {color: css("--muted"), width: 2, dash: "dot"}, hoverinfo: "skip", showlegend: false}));
+  Plotly.react("mapChart", [...lines, {
+    type: "scatter", mode: "markers+text", name: "Stored questions", x: P.map(p => p[0]), y: P.map(p => p[1]),
+    text: faq.map(f => f.question), textposition: pos, textfont: {color: css("--text-2"), size: 12},
+    customdata: d.sims, marker: {size: 12, color: css("--blue"), line: {color: css("--surface"), width: 2}},
+    hovertemplate: "%{text}<br>similarity to prompt = %{customdata:.4f}<extra></extra>",
+  }, {
+    type: "scatter", mode: "markers+text", name: "Your prompt", x: [q[0]], y: [q[1]], text: [d.question],
+    textposition: "middle right", textfont: {color: css("--text"), size: 13},
+    marker: {size: 20, symbol: "star", color: css("--orange"), line: {color: css("--surface"), width: 2}},
+    hovertemplate: "PROMPT: %{text}<extra></extra>",
+  }], layoutBase({xaxis: axis({title: {text: "PCA component 1"}, zeroline: false, range: xr}),
+                  yaxis: axis({title: {text: "PCA component 2"}, zeroline: false, range: yr}),
+                  legend: {orientation: "h", y: 1.06, x: 0}, margin: {l: 10, r: 10, t: 40, b: 40}}), cfg);
+}
+
+function renderMath() {
+  const d = last, A = d.vector, B = KB.vectors[d.best];
+  const prod = A.map((a, i) => a * B[i]);
+  const dot = prod.reduce((s, x) => s + x, 0);
+  const nA = Math.sqrt(A.reduce((s, x) => s + x * x, 0)), nB = Math.sqrt(B.reduce((s, x) => s + x * x, 0));
+  $("mathAB").innerHTML = `A = “${esc(d.question)}”  ·  B = “${esc(KB.faq[d.best].question)}” (best match)`;
+  $("mathMetrics").innerHTML = [["A · B (dot product)", dot.toFixed(4)], ["‖A‖ (prompt length)", nA.toFixed(4)],
+    ["‖B‖ (match length)", nB.toFixed(4)], ["cosine similarity", (dot / (nA * nB)).toFixed(4)]]
+    .map(([l, v]) => `<div class="card metric"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+  const top = [...prod.keys()].sort((i, j) => Math.abs(prod[j]) - Math.abs(prod[i])).slice(0, 20);
+  Plotly.react("contribChart", [{
+    type: "bar", x: top.map(i => "d" + i), y: top.map(i => prod[i]),
+    marker: {color: top.map(i => prod[i] >= 0 ? css("--blue") : css("--orange")), cornerradius: 4},
+    hovertemplate: "%{x}<br>A×B = %{y:+.5f}<extra></extra>",
+  }], layoutBase({title: {text: "The 20 dimensions that add the most to A · B (blue adds, orange subtracts)", font: {size: 14, color: css("--text")}, x: 0},
+                  margin: {l: 10, r: 10, t: 40, b: 40}, xaxis: axis({type: "category"}), yaxis: axis({title: {text: "A_i × B_i"}})}), cfg);
+  const f = x => (x >= 0 ? "+" : "") + x.toFixed(4);
+  $("contribTable").innerHTML = "<tr><th>dimension</th><th class='num'>A (prompt)</th><th class='num'>B (match)</th><th class='num'>A × B</th></tr>" +
+    top.map(i => `<tr><td>d${i}</td><td class="num">${f(A[i])}</td><td class="num">${f(B[i])}</td><td class="num">${(prod[i] >= 0 ? "+" : "") + prod[i].toFixed(5)}</td></tr>`).join("");
+}
+
+function renderTables() {
+  $("histTable").innerHTML = "<tr><th>Question</th><th>Best match</th><th class='num'>Similarity</th><th class='num'>Threshold</th><th>Route</th></tr>" +
+    history.map(h => `<tr><td>${esc(h.question)}</td><td>${esc(h.match)}</td><td class="num">${pct(h.sim)}</td><td class="num">${pct(h.threshold, 1)}</td>
+      <td><span class="badge ${h.route}">${h.route === "dataset" ? "✓ Dataset" : "↗ Transfer to LLM"}</span></td></tr>`).join("");
+}
+
+(async () => {
+  KB = await (await fetch("/api/kb")).json();
+  // the dataset questions are the main buttons
+  const qs = KB.faq.map(f => f.question), half = Math.ceil(qs.length / 2);
+  addChips("examples", "Questions in the dataset", qs.slice(0, half));
+  addChips("examples", "\u00a0", qs.slice(half));
+  $("dataTable").innerHTML = "<tr><th>#</th><th>Question (embedded)</th><th>Answer</th></tr>" +
+    KB.faq.map((f, i) => `<tr><td>${i + 1}</td><td>${esc(f.question)}</td><td>${esc(f.answer)}</td></tr>`).join("");
+  ask();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => last && render());
+})();
+</script>
+</body>
+</html>
